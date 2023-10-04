@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width">
+<title>P6 * Malloc</title>
+<link rel="stylesheet" href="P6%20Malloc_files/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<style>
+html {
+    height: 100%;
+}
+body {
+    height: calc(100% - 50px);
+}
+#project-wrapper {
+    position: relative;
+    height: 100%;
+    margin-top: 50px;
+    overflow-y: scroll;
+}
+.tab-content {
+    padding-top: 1px;
+}
+
+img {
+    padding: 12px;
+}
+blockquote.code-description {
+    font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<nav id="project-navbar" class="navbar navbar-default navbar-fixed-top site-header">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="#main"><span class="hidden-sm">Project 6 * </span>Malloc</a>
+    </div>
+    <div class="collapse navbar-collapse" id="project-navbar-collapse">
+      <ul class="nav navbar-nav">
+        <li class=""><a href="#overview">Overview</a></li>
+        <li class=""><a href="#malloc-specs">Malloc Specs</a></li>
+        <li class=""><a href="#spinlock-specs">Spinlock Specs</a></li>
+        <li class=""><a href="#comprun">Compile &amp; Run</a></li>
+        <li class=""><a href="#case-study">Case Study</a></li>
+        <li class=""><a href="#part1">Tests</a></li>
+        <li class=""><a href="#part2">Design</a></li>
+        <li><a href="#tips">Tips</a></li>
+        <li class=""><a href="#grading">Grading</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div id="project-wrapper" data-spy="scroll" data-target="#project-navbar">
+<div class="container">
+
+  <div id="main" class="tab-content">
+
+    <h1>Final Project - A Dynamic Memory Allocator</h1>
+    <p class="lead">CS 3410 Spring 2019</p>
+
+    <hr>
+    <p class="lead"><b>Schedule Design Doc Meeting by:</b> Sunday, May 5, 2019</p>
+    <p class="lead"><b>Design Doc Meetings:</b> May 6-7, 2019</p>
+    <!--<p class="lead"><b>Design Doc Deadline:</b> 11:59pm, Wednesday, May 7, 2019</p>-->
+    <p class="lead"><b>Deadline:</b> 4:30pm, Thursday, May 16, 2019</p>
+  There are no slip days or grace period for this deadline. Note the <span style="font-size:20px;">4:30pm university set due date</span>, not midnight.
+
+
+    <hr>
+
+<!-- First you will
+write a suite of tests that can be used to check whether an
+implementation of a dynamic memory allocation library is
+correct. You will need to think hard about the correct behavior
+of the library and how you can check for said correctness.
+</p> -->
+    <p>
+      In this assignment, you will implement a dynamic memory
+      allocation library (aka malloc) that supports the allocation,
+      freeing, and resizing of blocks of memory. Your implementation will be
+      assessed based on its correctness, its utilization of the memory
+      it manages, its performance speed, and how well you test it.
+      Lastly, we will be comparing your
+      implementation of malloc to your classmates' in a competition
+      for the best malloc!
+    </p>
+	<p>
+      You can find the files for this project in your Github repository. You may find these
+      <a href="https://github.com/git-tips/tips/blob/master/README.md"><i>git tips</i></a> useful.
+	  </p>
+
+    <h2 id="submit">What to submit:</h2>
+    <ul>
+        <!-- Are we still doing this? TODO -->
+        <li><code>alias.txt</code>: 1-line file containing your
+        Leaderboard Alias, to be used to identify you on
+        the <a href="http://www.cs.cornell.edu/courses/cs3410/2019sp/projects/malloc/leaderboard.html">Leaderboard</a>. The alias can
+        consist of alphanumerics only plus _ (underscore) or -
+        (hyphen) but no other symbols. It cannot start or end with a
+        symbol, and must have no more than 32 characters. Should your
+        alias not follow these rules, the 3410 TAs are more than happy
+        to create a great name for you. Remember to keep it clean,
+        folks.
+        </li>
+        <li><code>heaplib.c</code>: your implementation of malloc!</li>
+        <li><code>spinlock.c</code>: your implementation of a spin lock in RISCV!</li>
+    </ul>
+
+  </div>
+  <div id="overview" class="tab-content">
+
+    <h2>Overview</h2>
+
+    <p>
+      By now you should be familiar with static vs dynamic allocation.
+      Statically declared memory is allocated on the stack and exists
+      only for the life of the function in which it was created;
+      dynamically allocated memory is allocated on the heap and exists
+      from the moment it is allocated until it is explicitly
+      freed. Support for dynamic memory allocation is part of
+      the <a href="https://en.wikipedia.org/wiki/C_dynamic_memory_allocation">Standard
+      C Library</a>.
+    </p>
+
+    <p>
+      A dynamic memory allocator maintains the memory associated with
+      the heap.  The most basic task will be to keep track of which
+      bytes of the heap are currently in use (<i>i.e.</i>, are
+      allocated) and which bytes are not in use (<i>i.e.</i>,
+      free). On real systems, the heap can grow with the needs of a
+      process. For this assignment, however, we will consider the heap
+      to be a <b>fixed-size</b> block of memory. Your dynamic memory
+      allocator will always be associated with a
+      <code>void *heap</code> that points to the beginning
+      of the heap that you must manage. (The heap pointed to
+      by <code>heap</code> is a <i>simulated</i> version of the actual
+      heap that the C Standard Library manages.)
+    </p>
+    <p>
+      A dynamic memory allocator is a bit like an actual library (with
+      books). When someone asks for 512 bytes of memory, the allocator
+      finds 512 free contiguous bytes of memory for the caller and
+      returns the address of the first of these 512 bytes. These 512
+      bytes are now "checked out" and cannot be given out by any
+      subsequent requests until they are explicitly freed. The bytes
+      are freed when the user explicitly tells the allocator it no
+      longer needs the bytes beginning at that address.
+    </p>
+    <p>
+      For this assignment, it will be important to understand not only
+      what it means to correctly <i>implement</i> a dynamic memory
+      allocator, but also what it means to correctly <i>use</i> a
+      dynamic memory allocator. If at any point your code segfaults,
+      you must know whether the fault lies in the library or the user
+      of the library. For example, a user should never write past the
+      fixed-size heap. If they do, the problem could be that the user
+      has written past the chunk of memory they were given (this would be
+      the fault of the user), or it could be that the memory allocator
+      gave the user a block of memory which did not actually reside
+      entirely inside the heap (this would be the fault of the allocator).
+      To help you learn this distinction, we begin by having you write
+      tests that should correctly <i>use</i> the dynamic memory
+      allocator. (You started this in lab 12; you will be extending it in this
+      project.) Then, if any of the tests experience an error, you will know
+      the fault lies in the implementation. Once you have a test suite
+      that you can trust, you can use it to test your own implementation.
+    </p>
+    <p>
+      Remember <b>the best way to implement a large task is to break
+      it up into very small, <i>testable</i> subtasks.</b> Code a
+      little, test a lot. Code a little, test a lot... and so forth.
+    </p>
+
+  </div>
+  <div id="malloc-specs" class="tab-content">
+
+    <h2>Malloc Implementation Specs</h2>
+
+    <p>
+      Your dynamic memory
+      allocator will consist of four functions, which are
+      declared in <code>heaplib.h</code> and will be implemented (by you)
+      in <code>heaplib.c</code>. The functions <code>hl_alloc()</code>,
+      <code>hl_release()</code>, and <code>hl_resize()</code>
+      correspond to the actual C Standard Library
+      functions <code>malloc()</code>, <code>free()</code>,
+      and <code>realloc()</code>. You should use your understanding of
+      these functions to guide your implementation, but <b>nowhere
+      in your submission should you call these three functions.</b>
+    </p>
+
+    <h3><code>int hl_init(void *heap, unsigned int heap_size)</code></h3>
+    <blockquote class="code-description">
+      <p>
+        Sets up a new heap beginning at <code>heap</code> of size
+        <code>heap_size</code> (in bytes). Returns 1 if setup was successful and 0 otherwise.
+        This function does not
+        allocate the heap (of size <code>heap_size</code>) pointed to
+        by <code>heap</code>. That should be done already by the
+        user calling this function.
+      </p>
+
+      <i>PRECONDITIONS:</i>
+      <ol>
+        <li>the allocated heap must be <code>heap_size</code> in bytes</li>
+        <li><code>heap_size</code> must be &gt;= MIN_HEAP_SIZE (here, 1024)</li>
+      </ol>
+	    <i>If precondition (1) is violated, non-graceful failure is acceptable. <code>hl_init</code> must gracefully fail with the correct return value if precondition (2) is violated.</i>
+    </blockquote>
+    <p>
+      See the given tests in the <code>tests.c</code> file for what it
+      means to allocate the heap before calling <code>hl_init</code>.
+    </p>
+    <p>
+      This <code>hl_init</code> function should be called <i>exactly once</i>
+      for each heap being managed.
+    </p>
+    <p>
+      Your memory allocator must live entirely inside the heap it is
+      managing. All meta-data (pointers, size fields, flags indicating
+      free or in-use) must all live in the heap itself. <b>You may not
+      use any global variables or structures.</b> Every variable or
+      structure must live inside either the heap or in the local
+      function being executed. Your design should work for any heap
+      size that is at least 1024 bytes in size.
+    </p>
+
+    <h3><code>void *hl_alloc(void *heap, unsigned int block_size)</code></h3>
+    <blockquote class="code-description">
+      <p>
+        Allocates a block of memory of size <code>block_size</code> bytes from the heap
+        starting at <code>heap</code>.
+      </p>
+
+      <p>
+        Returns a pointer to the block on success; returns 0
+        (<code>NULL</code>) if the allocator cannot satisfy the request.
+      </p>
+
+      <i>PRECONDITIONS:</i>
+      <ol>
+        <li><code>hl_init</code> must have been called exactly once for this heap</li>
+      </ol>
+      <i>If preconditions are violated, non-graceful failure is acceptable.</i>
+    </blockquote>
+
+    <p>
+      The returned address should be aligned at multiples of 8
+      bytes, but <code>heap</code> is not required to be 8-byte
+      aligned. The function is allowed to allocate
+      <i>more</i> than the requested size, but never less. The
+      memory "allocated" by this function does not need to be zeroed
+      out. Requested blocks of memory can be of size 0.
+    </p>
+
+    <h3><code>void hl_release(void *heap, void *block)</code></h3>
+    <blockquote class="code-description">
+      <p>
+        Releases the block of memory pointed to by <code>block</code> (which
+        currently resides in the heap pointed to by <code>heap</code>). Acts as
+        a NOP if <code>block</code> == 0 (<code>NULL</code>).
+      </p>
+
+      <i>PRECONDITIONS:</i>
+      <ol>
+        <li><code>block</code> must have been returned to the user from a prior
+        call to <code>hl_alloc</code> or <code>hl_resize</code></li>
+        <li><code>hl_release</code> can only be called ONCE in association with
+        that prior call to <code>hl_alloc</code> or <code>hl_resize</code></li>
+      </ol>
+      <i>If preconditions are violated, non-graceful failure is acceptable.</i>
+    </blockquote>
+
+    <p>
+      For utilization purposes, released memory should be able to be
+      allocated again by subsequent calls to
+      <code>hl_alloc</code>.  The memory released by this function
+      does not need to be zeroed out.
+    </p>
+
+    <h3><code>void *hl_resize(void *heap, void *block, unsigned int new_size)</code></h3>
+    <blockquote class="code-description">
+      <p>
+        Changes the size of the block pointed to by <code>block</code> (that
+        currently resides in the heap pointed to by <code>heap</code>) from its
+        current size to size <code>new_size</code> bytes, returning a pointer
+        to the new block, or 0 if the request cannot be satisfied. The contents
+        of the block should be preserved (even if the location of the block
+        changes -- this will happen when it is not possible to increase the
+        size of the current block but there is room elsewhere on the heap to
+        satisfy the request). If <code>block</code> has the value 0
+        (<code>NULL</code>), the function should behave like
+        <code>hl_alloc</code>.
+      </p>
+
+      <i>PRECONDITIONS:</i>
+      <ol>
+        <li><code>block</code> must have been returned to the user from a prior
+        call to <code>hl_alloc</code> or <code>hl_resize</code></li>
+      </ol>
+      <i>If preconditions are violated, non-graceful failure is acceptable.</i>
+    </blockquote>
+
+    <p>
+      Note: The new block size might be smaller than the current
+      size of the block.  As for <code>hl_alloc</code>, the
+      return value should be 8-byte aligned.  You can copy the
+      contents of a chunk in memory by using <code>memmove</code> or
+      cast <code>block</code> to a <code>char *</code> and
+      copy the contents byte by byte.
+    </p>
+
+  </div>
+
+  <div id="spinlock-specs" class="tab-content">
+    <h2>Spinlock Specs</h2>
+
+    <p>
+      Your malloc implementation is required to be thread-safe, so that multiple
+      threads trying to allocate dynamic memory at the same time do not cause malloc
+      to break. For this assignment, you will handle this requirement with a simple
+      <b>spinlock</b> implementation. This will require you to use the <code>LR</code>
+      and <code>SC</code> RISC-V instructions via inline assembly.
+    </p>
+
+    <p>We will fill this in with more information in the near future. 
+For now, focus on other aspects of the implementation; spin locks can be
+ added after the rest is implemented.</p>
+  </div>
+
+  <div id="comprun" class="tab-content">
+    <h2>Compiling and Running Your Code</h2>
+    <!-- This all needs to be updated for our new system -->
+    <p>
+      You have been given the following files as part of this assignment (the ones
+      in <b>bold</b> are the files you will modify and submit):
+    </p>
+
+    <ul>
+      <li><code>Makefile</code> -- compiles 4 possible executables, each with 3 possible versions (see below)</li>
+      <li><code>heaplame.c</code> -- a deliberately flawed malloc implementation for testing purposes</li>
+      <li><code>heaplesslame.c</code> -- a copy of heaplame.c that you are welcome to modify (will not be submitted)</li>
+      <li><code>heaplib.h</code> -- the interfaces of the functions you are to test and implement</li>
+      <li><b><code>heaplib.c</code></b> -- your implementation will go here</li>
+      <li><b><code>tests.c</code></b> -- your test suite will go here</li>
+      <li><code>test_heaplib.c</code> -- contains the main() function that will call your tests</li>
+      <li><code>spinlock.h</code> -- the interfaces for the lock you are to implement</li>
+      <li><b><code>spinlock.c</code></b> -- you will implement this with inline RISCV assembly</li>
+    </ul>
+
+    <!-- TODO: Change the instructions for compiling to reflect the MIPS s
+    simulator -->
+    <p>
+    	Before compiling your code, run <code>python setup.py</code> to initialize the necessary environment.
+    </p>
+    <p>
+      When you run <code>make</code>, it will compile the executable <code>test_heaplib</code>,
+      which will run your <code>tests.c</code> file, which will test the library you
+      implement in <code>heaplib.c</code>. The tests file currently contains a few tests
+      but is not exhaustive; you should add your tests from lab 12 <b>as well as</b>
+      any other tests necessary to catch broken mallocs. Your tests file will be graded
+      on how many of our broken mallocs they catch, not on how many tests there are (see the
+      test suite section for details).
+    </p>
+
+    <p>
+      Once compiled, you can run a specific test with <code>./test_heaplib n</code> where n is the test number.
+    </p>
+
+    <p>
+      You may pass different arguments to <code>make</code> to change which version will
+      be built and which library to use. If you type <code>make help</code> you will see
+      a slightly longer version of the following message:
+    </p>
+
+<pre class="nohighlight">Your custom heaplib.c implementation targets:
+  make                   : heaplib.c
+  make debug             : heaplib.c with debugging symbols
+  make print-debug       : heaplib.c with debugging symbols and PRINT_DEBUG
+</pre>
+
+    <ul>
+      <li>The first target produces a "production level" executable. This is how
+          we will compile your code when we test it.</li>
+      <li>The second target is an executable that contains all
+          the symbols (variable and function names, line numbers, etc.) required
+          to run your code in gdb.</li>
+      <li>The third target is an executable that has both
+          debugging symbols and has defined the PRINT_DEBUG macro that will
+          enable all the debugging print statements in your code.</li>
+    </ul>
+
+    Since you will spend much more time working with <code>heaplib.c</code>, this is the
+    default library that will be used. To use a library other than <code>heaplib.c</code>:
+
+    <ul>
+      <li>
+        Run <code>make lame</code> (or <code>make lame-debug</code>/<code>make lame-print-debug</code>)
+        to use the <code>heaplame.c</code> implementation instead of <code>heaplib.c</code>.
+      </li>
+      <li>
+        Run <code>make ll</code> (or <code>make ll-debug</code>/<code>make ll-print-debug</code>)
+        to use <code>heaplesslame.c</code>.
+      </li>
+      <li>
+        Run <code>make riscv</code> (or <code>make riscv-debug</code>/<code>make riscv-print-debug</code>)
+        to use <code>heaplib.c</code> with a RISC-V toolchain. Use this if you want to step through
+        any assembly in gdb.
+      </li>
+    </ul>
+
+    <p>
+      You can also put <code>scan-build</code> in front of any of these make commands, e.g. <code>scan-build make</code>.
+      This will run a static analyzer over your codebase, which you can find out more about
+      <a target="_blank" href="https://clang-analyzer.llvm.org/scan-build.html">here</a>.
+      Go ahead and peek at the Makefile. It is fantastically
+      documented. You do not need to modify the Makefile for this
+      assignment. (If you choose to modify it, keep in mind that we
+      will use the original when we test your code.)
+    </p>
+
+  </div>
+
+
+  <!-- TODO: how should we deal with this? It seems that having this could be
+    helpful to students by at least allowing them to understand how each part   should be implemented. It also demostrates malloc in a digestible form.
+    Yet... it is inconsistent with everything else.-->
+
+  <div id="case-study" class="tab-content">
+    <h2>Heaplame Deep Dive</h2>
+
+    <div class="panel panel-default">
+      <div class="panel-heading" role="tab" id="heaplame-heading">
+        <h3 class="panel-title">
+          <a role="button" data-toggle="collapse" data-parent="#heaplame" href="#heaplame-body" aria-expanded="false" aria-controls="heaplame-body">
+            Heaplame - the lame functionality ... (click to expand/shrink)
+          </a>
+        </h3>
+      </div>
+      <div id="heaplame-body" class="panel-collapse collapse" role="tabpanel" aria-labelledby="heaplame-heading">
+        <div class="panel-body">
+
+          <p>
+            We have provided you with a lame implementation of the
+            assignment in <code>heaplame.c</code>. This implementation
+            is meant to give you a way to start understanding how a
+            dynamic memory allocator might work, but beware:
+            (1) <b>this implementation is buggy</b>. In several
+            respects, it does <i>not</i> follow the specs above and
+            (2) this approach is inherently simplistic. The overall
+            approach of <code>heaplame.c</code> is to keep track of
+            only N_SUPPORTED_BLOCKS:
+          </p>
+
+<pre class="hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> N_SUPPORTED_BLOCKS 5</span>
+</pre>
+
+          <p>
+            This means that the user may only allocate 5 blocks at a
+            time. (Pretty lame, huh?) The information for each block
+            (the size and the starting address of the block) is stored
+            in a the following defined structure
+            called <code>block_info_t</code>:
+          </p>
+
+<pre class="hljs cpp"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> _<span class="hljs-title">block_info_t</span> {</span>
+    <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">int</span> block_size;
+    <span class="hljs-keyword">void</span> *block;
+} <span class="hljs-keyword">block_info_t</span>;
+</pre>
+
+          <p>
+            This block information is stored in an array in a
+            containing structure called <code>block_header_t</code>:
+          </p>
+
+<pre class="hljs cpp"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> _<span class="hljs-title">heap_header_t</span> {</span>
+    <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">int</span> heap_size;
+    <span class="hljs-keyword">block_info_t</span> blocks[N_SUPPORTED_BLOCKS];
+    <span class="hljs-keyword">bool</span> in_use_f[N_SUPPORTED_BLOCKS];
+} <span class="hljs-keyword">block_header_t</span> ;
+</pre>
+
+          <p>
+            This implementation dedicates the beginning of the heap to
+            the metadata (which is initialized
+            in <code>hl_init</code>), and the remaining portion of the
+            heap to the 5 blocks allocated for the user.
+          </p>
+
+          <p>
+            In the beginning (see <i>Figure 1</i>) there is an array
+            which the user has created (either by statically
+            allocating it on its stack or by
+            calling <code>malloc</code>). This is the area of memory
+            which simulates the heap. If you look
+            in <code>heaplib.h</code>, you will see the following
+            definition:
+          </p>
+
+<pre class="hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> MIN_HEAP_SIZE 1024</span>
+</pre>
+
+          <p>
+            Let's step through the implementation of some of the
+            functions. <i>Figure 1</i> shows the state of memory
+            before a call to <code>hl_init</code> with a
+            heap of size 1024 beginning at address x100:
+          </p>
+
+          <img class="img-responsive" src="P6%20Malloc_files/fig1.png" alt="figure1">
+
+          <p>
+            After the call to <code>hl_init</code>, the meta data has
+            been initialized and the heap looks as shown below in
+            <i>Figure 2</i>:
+          </p>
+
+          <img class="img-responsive" src="P6%20Malloc_files/fig2.png" alt="figure2">
+
+          <p>
+            <i>Figure 3</i> shows what a subsequent call to <code>hl_alloc</code>
+            with a block size of 512 bytes would change the heap:
+          </p>
+
+          <img class="img-responsive" src="P6%20Malloc_files/fig3.png" alt="figure3">
+
+          <p>
+            <i>Figure 4</i> shows how a call to resize would change the heap:
+          </p>
+
+          <img class="img-responsive" src="P6%20Malloc_files/fig4.png" alt="figure4">
+
+          <p>
+            These diagrams are <b>not</b> intended to show you the
+            correct behavior of the functions you should
+            implement. Instead they show you an accurate depiction of
+            what is currently implemented so that you may fully
+            understand the code you have been given. In fact, the code
+            you have been given is woefully incomplete and incorrect.
+            You should take some time to look at the implementation,
+            run it through a few of the given tests, and write your
+            own tests that expose the ways in which the code is broken
+            or inadequate.
+          </p>
+
+          <p>
+            <b>Known Correctness Bugs.</b> In addition to being really
+            unfriendly (allowing only five blocks to be allocated!),
+            the lame solution in <code>heaplame.c</code> is incorrect
+            in several respects:
+          </p>
+
+          <ol>
+            <li>no functions return pointers that are 8-byte aligned</li>
+            <li><code>heap</code> is assumed to be 8-byte aligned</li>
+            <li>not all functions behave correctly when given null
+            block pointers</li>
+          </ol>
+          <p>.... and possibly more???</p>
+
+          <p>
+            Although the implementation is not a working solution, it
+            provides you important examples of heap management,
+            casting, pointer arithmetic, and debugging.
+          </p>
+
+          <p>
+            Fixing all of the problems in this implementation would
+            require a significantly different approach than the lame
+            implementation. You are encouraged to spend some time
+            thinking about how to debug this code (and to place your
+            fixes in <code>heaplesslame.c</code> for sanity's sake,
+            but it should not be viewed as the baseline for your own
+            implementation, which should be far more
+            sophisticated. For Part 2 of this assignment, you will be
+            asked to come up with a completely new approach to a
+            dynamic memory allocator--one that is robust enough to
+            accomplish the task.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading" role="tab" id="heaplame-heading2">
+        <h3 class="panel-title">
+          <a role="button" data-toggle="collapse" data-parent="#heaplame2" href="#heaplame-body2" aria-expanded="false" aria-controls="heaplame-body2">
+            Heaplame - the cool coding lessons ... (click to expand/shrink)
+          </a>
+        </h3>
+      </div>
+      <div id="heaplame-body2" class="panel-collapse collapse" role="tabpanel" aria-labelledby="heaplame-heading2">
+        <div class="panel-body">
+
+          <ul>
+            <li><p>
+                <b>Casting.</b>
+                Take a look at the implementations of <code>hl_init</code> and
+                <code>hl_alloc</code>. Notice that casting
+                the <code>heap</code> to a <code>heap_header_t *</code> is
+                a straightforward and very readable way to set and access the
+                fields of the otherwise unspecified heap.
+            </p></li>
+
+            <li><p>
+                <b>print_debug functions.</b>
+                Look at the function <code>print_debug_entering_init</code>. It
+                only prints "Entering hl_init()" to the screen. Although this
+                function may be useful to a programmer when implementing and
+                debugging, it is not the kind of information that should be
+                printed to the screen when a program includes and makes calls
+                to your <code>heaplib</code> library. Novice programmers
+                notoriously litter their code with print statements that are
+                commented in and out as they code. This is not good form,
+                especially since some straggling <code>printf</code>'s almost
+                always remain in the final version of the code. Print
+                statements can be particularly devastating during a long run --
+                at best they make the code painfully slow; at worst they fill
+                up the hard drive and make the computer unusable.
+            </p></li>
+
+            <p>
+              One solution to this problem is to create a variable such as
+              <code>debug_mode_f</code> (<code>_f</code> often indicates a flag in C)
+              and put the print statement inside an <code>if</code> statement that
+              checks the variable:
+            </p>
+
+<pre class="hljs cpp"><span class="hljs-keyword">if</span> (print_debug_f) {
+    print_heap(heap);
+}
+</pre>
+
+            <p>
+              This solution has the nice property that (if tied to a command line
+              option) the flag can be turned off and on each time you run the
+              program. The problem with this approach is that even your
+              "production-level" code will be littered with <code>if</code>
+              statements that always evaluate to false.
+            </p>
+
+            <p>
+              The code you have been given solves the problem by placing the
+              body of the print statement as the <i>controlled text</i> in
+              a <i>conditional group</i>:
+            </p>
+
+<pre class="hljs cpp"><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">print_debug_entering_init</span><span class="hljs-params">()</span> </span>{
+<span class="hljs-meta">#<span class="hljs-meta-keyword">ifdef</span> PRINT_DEBUG</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">"Entering hl_init()\n"</span>);
+<span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span>
+}
+</pre>
+
+            <p>
+              The preprocessor (part of the compiler) will only insert the
+              controlled text if the <code>PRINT_DEBUG</code> has been
+              defined/set.<br>  This Macro approach requires re-compiling in
+              order to insert the print statements. If you didn't want to
+              create a separate function, you could also simply wrap
+              the <code>printf</code> directly:
+            </p>
+
+<pre class="hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">ifdef</span> PRINT_DEBUG</span>
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">"the value of x is %d\n"</span>, x);
+<span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span>
+</pre>
+            <p>
+              This may not be the best strategy for every scenario, but it
+              is good for this assignment. <b>Do not use any print
+                statements inside your <code>heaplib.c</code> that are not
+                wrapped in an
+                <code>#ifdef</code> flag.</b> <a href="#comprun">Compiling
+                and Running Your Code</a> discussed how to turn the flag on and off
+              at compile time.
+            </p>
+
+            <li><p>
+                <b>Pointer arithmetic.</b>
+                To implement this assignment, you will need to understand pointer arithmetic.
+                As a basic example, see the following snippet of code:
+            </p></li>
+
+<pre class="hljs cpp"><span class="hljs-keyword">int</span> <span class="hljs-built_in">array</span>[<span class="hljs-number">4</span>];
+<span class="hljs-keyword">int</span> *ptr = &amp;<span class="hljs-built_in">array</span> + <span class="hljs-number">1</span>;
+</pre>
+
+            <p>
+              What do you think <code>ptr</code> points to? Not sure? Paste
+              the code into
+              the <a href="http://pythontutor.com/c.html#mode=edit">C
+                Tutorial</a>, click on "Visualize Execution", and step through
+              it. When you add 1 to the pointer, the unit of addition
+              is <code>int</code>, meaning that you're taking the base
+              address of <code>array</code>, and saying "go one integer
+              later". The 1 is actually 1 <i>integer</i>, or 4 bytes.
+            </p>
+
+            <p> When you are manipulating pointers in this assignment, you
+              may often want to add "raw bytes". For example, if you want to
+              get the address that is 16 bytes into your heap, which you've
+              already cast to be a <code>heap_header_t *</code>, you would
+              need to write:
+
+</p><pre class="hljs cpp"><span class="hljs-keyword">heap_header_t</span> *header = (<span class="hljs-keyword">heap_header_t</span> *)heap;
+<span class="hljs-keyword">void</span> *sixteen_later = ((<span class="hljs-keyword">char</span> *)header)+<span class="hljs-number">16</span>;
+</pre>
+
+              <p>
+                Because we suspect you might want to do addition like this a
+                lot, we've provided you with a simple <code>#define</code>:
+              </p>
+
+<pre class="hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ADD_BYTES(base_addr, num_bytes) (((char *)(base_addr)) + (num_bytes))</span>
+</pre>
+
+              <p>which you can could then use as follows:</p>
+
+<pre class="hljs cpp"><span class="hljs-keyword">heap_header_t</span> *header = (<span class="hljs-keyword">heap_header_t</span> *)heap;
+<span class="hljs-keyword">void</span> *sixteen_later = ADD_BYTES(header, <span class="hljs-number">16</span>);
+</pre>
+
+              <li><p>
+                  <b>C is not the same everywhere!</b>  You should not assume
+                  that you know the size of all variable types in
+                  C. An <code>int</code> might be 4 bytes on one machine and 8
+                  bytes on another. This is one reason why it is <b>VERY</b>
+                  important to use the VM or the Linux machines we have
+                  provided for this class for this specific assignment. If you
+                  never run your code on the machines we test them on, you may
+                  be in for a horrible, seg-faulty surprise. It is always a
+                  good idea to use <code>sizeof()</code> instead of assuming
+                  you know the size of any variable or type in your
+                  code. Alternatively, <code>uintptr_t</code> in
+                  <code>&lt;stdint.h&gt;</code> is guaranteed to contain
+                  the size of a pointer on the machine where the executable is
+                  running. You may find this useful.
+              </p></li>
+
+              <p>
+                Another aspect of C is that the compiler will align your
+                structures for you. How it performs the alignment varies not
+                only by machine but also by operating system, so once again,
+                do not make any assumptions. As an example, look at the
+                definition of <code>heap_header_t</code>.
+              </p>
+
+<pre class="hljs cpp"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> _<span class="hljs-title">heap_header_t</span> {</span>
+    <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">int</span> heap_size;
+    <span class="hljs-keyword">block_info_t</span> blocks[N_SUPPORTED_BLOCKS];
+    <span class="hljs-keyword">bool</span> in_use_f[N_SUPPORTED_BLOCKS];
+} <span class="hljs-keyword">heap_header_t</span> ;
+</pre>
+
+              <p>
+                How large is this structure? <code>hl_alloc</code>
+                calculates the size of the header to be:
+              </p>
+<pre class="hljs cpp"><span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">int</span>) <span class="hljs-comment">/* heapsize */</span>
++ <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">block_info_t</span>) * N_SUPPORTED_BLOCKS <span class="hljs-comment">/* block info */</span>
++ <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">bool</span>) * N_SUPPORTED_BLOCKS <span class="hljs-comment">/* in use */</span>
+</pre>
+
+              <p>
+                However, if you simply said <code>sizeof(heap_header_t)</code>
+                you might get a different answer because the size of the
+                structure is typically rounded to a size that is divisible by 4
+                (or sometimes 8). This is one of the reasons we require you to
+                keep your block pointers also 8-byte aligned. (This is also one
+                of the reasons we did not put the <code>in_use_f</code> flags
+                inside the <code>block_info_t</code> structure.) You should
+                decide exactly how you want to pack your data in the heap. It
+                will be important for you to understand structure alignment so
+                that as you make these decisions you understand how to
+                implement them.
+              </p>
+
+              <li><p>
+                  <b>Using Macros.</b>
+                  A <b>macro</b> is a &lt;keyword,
+                  definition&gt; pair. Any reference to the keyword will be
+                  replaced by the definition <i>at compile time</i>. You may be
+                  familiar with simple macros such as:
+              </p></li>
+
+<pre class="hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ALIGNMENT 8</span></pre>
+
+              <p>
+                which is a great way to rid your code of magic numbers. Macros can
+                also be more complex, taking arguments. For example:
+              </p>
+
+<pre class="hljs cpp"><span class="hljs-comment">/* Useful shorthand: casts a pointer to a (char *) before adding */</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> ADD_BYTES(base_addr, num_bytes) (((char *)(base_addr)) + (num_bytes))</span>
+</pre>
+
+              <p>
+                We recommend using macros for any complicated but simple tasks; your
+                code will be much more readable, maintainable, and debug-able at no
+                performance cost.
+              </p>
+
+              <li><p>
+                  <b>Ternary Operators.</b>
+                  You will also notice that a ternary operator is used in the
+                  <code>print_block_header</code> function of heaplame. This is very
+                  useful as it allows you to have a conditional output without explicitly
+                  writing an if statement.
+              </p></li>
+
+<pre class="hljs cpp">block-&gt;in_use_f ? <span class="hljs-string">"Yes"</span> : <span class="hljs-string">"No"</span></pre>
+
+              <p>
+                The value before the <code>?</code> is a boolean expression, and if
+                true, evaluates to <code>"Yes"</code>, otherwise it evaluates to
+                <code>"No"</code>.
+              </p>
+
+              <p>
+                Note that the ternary operator has very low precedence, so be sure to
+                wrap your ternary operator usage in parentheses! i.e.
+              </p>
+
+<pre class="hljs">(x ? 1 : 2)</pre>
+
+              <p>instead of</p>
+
+<pre class="hljs">x ? 1 : 2</pre>
+
+            </ul>
+
+            <p>
+              <b>Make sure your dynamic memory allocator implementation is easy to read
+              and debug.</b> Not only will it make it easier to progress on this project,
+              but we will also deduct style points for egregiously-designed code.
+              The given sample code has all sorts of tricks in it because these are tricks that expert
+              programmers know about and use regularly. Now that you have been shown
+              these techniques, you will be expected to use them.
+            </p>
+
+            <p>
+              Cost of a long project writeup? 15 minutes. Shedding
+              your status as a novice and being able to produce code that is readable,
+              debug-able, and portable? <b>Priceless.</b>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div id="part1" class="tab-content">
+        <h2>Malloc Test Suite</h2>
+
+        <!-- This needs to be updated with information from the team
+        implementing the test suite. -->
+
+        <p>
+          Our autograder contains an extensive lineup of tests as well as several
+          variations of broken mallocs. You will be graded on how well your
+          implementation passes our tests, as well as how many of our broken mallocs
+          are caught by your test suite. This is why submitting a solid test suite
+          will be important for this project! <b>We strongly recommend you complete
+          this part before starting work on your own implementation.</b>
+        </p>
+
+        <p>
+          Look in <code>test_heaplib.c</code> and <code>tests.c</code> to
+          see how the test suite is structured. There is room for <b>24
+            tests</b>.
+            <!-- Tests 0-3 have been completed for you. Test 16 has been
+          started for you but is not complete. You can run a test by
+          typing <code>make lame-print-debug</code> (if you want the debug
+          print statements) or <code>make lame</code> (if you don't) at the
+          terminal and then <code>./test_heaplib n</code>, where n is a
+          number from 0 to 23. -->
+        </p>
+
+        <h3>Spec Tests (0-15)</h3>
+
+        <p>
+          "Spec tests" detect ways in which a heaplib implementation does not
+          meet the given specifications. There are many ways in which
+          <code>heaplame.c</code> is not up to spec. Your task is to write
+          tests that detect these problems. Use the known problems
+          in <code>heaplame</code> as a way to foresee and avoid possible
+          problems that <i>your</i> code could experience once you get to implementing it.
+        </p>
+
+        <p>
+          <code>heaplesslame.c</code> currently contains a copy of <code>heaplame.c</code>,
+          but you are free to modify <code>heaplesslame.c</code> until it passes all of
+          the tests that <code>heaplame.c</code> failed.
+
+          <code>heaplesslame.c</code> will not be submitted to CMS, but many
+          students in the past have found it helpful to their understanding to
+          have completed it before starting their own implementations.
+        </p>
+
+        <h3>Stress Tests (16-23)</h3>
+
+        <p>
+          "Stress tests" detect errors that might only occur after many
+          calls to the <code>heaplib</code> library. This could be due to
+          subtle bugs, corner cases, or just errors that only manifest
+          under extreme conditions (like the heap filling up).
+        </p>
+        <p>
+          There are two classic problems that result from a buggy
+          implementation of <code>heaplib</code>:
+        </p>
+        <p>
+          The first we will call a <b>structural integrity</b>
+          problem. At some point a field in the heap thought to contain
+          a pointer will no longer contain a valid address. Perhaps you
+          have a <code>next</code> pointer in a linked list, but you
+          accidentally overwrite it with the size of a block. Now you
+          try to dereference the address <code>42</code>. This will
+          result in a segmentation fault. Bugs that corrupt the
+          structural integrity of your heap lead to fatal errors at
+          runtime. You can test for structural integrity problems by
+          simply hammering the library with a bunch of calls
+          to <code>alloc</code>, <code>resize</code>,
+          and <code>free.</code> If the test finishes, it is a
+          success. If a segmentation fault occurs, the test has failed.
+        </p>
+        <p>
+          The second problem we will call a <b>data integrity</b>
+          problem. In this case, a buggy implementation will either give
+          the user a bad block of memory (maybe a block that goes past
+          the edge of the heap, for example, or a block with some
+          overlapping region that has already been given out in a
+          previous request to alloc that has not yet been freed) OR the
+          library itself writes something into the block portion of
+          the heap, which it should never do unless that block has been
+          freed by the user. You can test for data integrity by
+          requesting blocks from the library and then filling the block
+          with data. After subsequent calls to the library, check and
+          see whether the data is still intact.
+        </p>
+        <p>
+          <b>TIPS:</b>
+        </p>
+        <ul>
+          <li>Make sure you use legal, well-formed calls. Also, make
+            sure that the errors are a result of the heap library, and
+            not your test:</li>
+          <ul>
+            <li> if you ask for 24 bytes and then fill 42 bytes, you
+              will probably corrupt data on your heap, but that's the
+              test's fault not the library's.</li>
+            <li> if you try to call free with a pointer that was
+              never returned by the library from a previous call to
+              alloc, the library might very well seg-fault, but that's
+              the test's fault not the library's. You cannot free
+              something that was never allocated in the first place.</li>
+          </ul>
+          <li>It is recommended that you have one test that uses
+            just <code>alloc</code> and <code>free</code> and another
+            one that includes <code>resize</code>. This way you can
+            test your both before and after you have
+            implemented <code>resize</code>.</li>
+          <li>It is recommended that your stress tests have at least
+            100 calls to each function. Please use loops and arrays that
+            hold pointers. The tests should not be hundreds of lines long!</li>
+          <li>It is recommended that your stress tests call for blocks of
+            varying sizes. Structural and data corruption often manifests
+            itself only when different blocks are requested for, not when
+            the same chunk of memory is requested and freed repeatedly.</li>
+          <li> Our robustness tests (which we will use to grade your
+            code) check for both structural and data integrity. However,
+            how you write these tests is your choice.</li>
+        </ul>
+
+        <p>You should maintain the current structure of the test suite:</p>
+
+        <ul>
+          <li>A 1-line description of each test, ending in whether the test
+            passes or fails when you run <code>./test_heaplib [test #]</code>.
+            This description should be put at the top of your
+            <code>tests.c</code> file.</li>
+          <li>A comment before each test indicating which functions you are
+            testing, what specification you are checking, and how an error
+            would manifest.</li>
+          <li>Embed all print statements inside the <code>PRINT_DEBUG</code> macro.</li>
+        </ul>
+
+        <p>
+          You will submit your <code>tests.c</code> file to CMS. Each
+          submission will trigger an automatic autograder run and you will
+          receive an email with the result of your tests. We will run your
+          spec tests on variations of <code>heaplame</code> that have
+          isolated individual errors. We will run your stress tests on a
+          suite of "broken mallocs". The more of them your stress tests
+          flag as broken, the better your grade.
+          <br>
+          The test suite will be graded on how thoroughly it catches
+          implementation errors. Tests that yield false positives (finding
+          errors where there are none) will be discounted.
+        </p>
+
+        <p>
+          <b>IMPORTANT:</b>
+          You are graded on how many broken mallocs your test suite finds, not
+          on how many tests you have! In semesters past, students have asked for
+          more test placeholders.
+          This is why you have room to write 23 tests. However, you certainly do not need
+          all 23 of them to receive full credit on testing.
+        </p>
+
+        <p>You will have 5 autograder runs per day. <b>Failure to compile still counts as a run.</b></p>
+
+        <p>
+          <b>What constitutes a good test?</b>
+          A good test should flag a broken implementation as broken, but it must
+          not flag a correct implementation as broken. If your tests violate
+          the preconditions or the usage model of <code>heaplib</code>, they
+          will be ignored when grades are assigned.
+        </p>
+
+        <p>
+          <b>What constitutes flagging as broken?</b>
+          You can either return <code>FAILURE</code> from your test function,
+          or you can have the code <code>SEGFAULT</code>. The second option may
+          seem unintuitive at first, but it is helpful to realize that if an
+          implementation of malloc is indeed broken, it will have bad behavior
+          such as <code>SEGFAULT</code>ing.<br>
+        </p>
+
+      </div>
+
+      <div id="part2" class="tab-content">
+
+        <h2>Designing and Implementing Your Own Memory Allocation Library</h2>
+
+		<p>
+		  Now that you have written solid tests, it is time for you to implement
+		  your own malloc library. Your code must follow both the interface and the
+		  functional specifications which were outlined <a href="#malloc-specs">above</a>.
+		</p>
+
+		<!-- <p>On canvas there is an introduction to a simple
+		  implemenation of malloc. You are encouraged to keep your
+		  implemenation simple; simple and correct is worth far
+		  more than sophisticated and broken.</p> -->
+
+		<p>You are free to implement malloc as we suggest or use your
+		  own original ideas. As you consider your options, you should
+		  <b style="color:red;">under no circumstances look at anyone
+			else's code (including code on the internet).</b>
+		</p>
+
+        <!-- which utilization scoring did we decide on? -->
+		<p>
+		  Your implementation will be graded based on <b>correctness</b>.
+		  <i>Correct</i> implementations of <code>heaplib.c</code>
+		  will then be evaluated on memory <b>utilization</b> and <b>speed</b>.
+		  (Incorrect implementations will not be tested
+		  for utilization--and will forgo the points associated with these
+		  tests--because these metrics are meaningless in the context of
+		  an incorrect program. (Example: you can fulfill <i>many</i>
+		  allocation requests when you give everyone the same overlapping
+		  bytes in the heap...)
+		</p>
+
+    <p><b>Utilization.</b>  When a heap is initialized, it is given a
+      fixed memory area that it can use to fulfil allocation
+      requests. (Note: the actual heap on a real system can grow as
+      needed within the virtual address space of the process. The
+      fixed-sized heap in this assignment is an artificial but
+      simplifying restriction.)
+    </p>
+
+    <ul>
+      <li><b>Overhead</b>: the first aspect of heap utilization relates to
+        how much meta data your implementation requires. Meta-data is the
+        information <i>about</i> the block, the size of each block,
+        whether it is free, etc. Less meta data allows you to dedicate
+        more of the heap to service alloc requests. </li>
+      <li><b>Management</b>: the second aspect of heap utilization relates
+        to the management of the heap itself. Careful implementations of
+        alloc, resize, and free will keep your heap less fragmented and more
+        able to fulfil future allocation and resize requests.</li>
+	  <li><b>Allocation Strategies.</b>
+		Think about the pros and cons of some common allocation strategies. A
+		<b>first-fit</b> approach always gives the user the first
+		memory block in the region that is big enough to fulfil the
+		request. This is the easiest to implement.  A <b>best-fit</b>
+		approach gives the user the <i>smallest</i> memory block that
+		fulfils the request.</li>
+	  <li><b>Fragmentation.</b>
+        After responding to many calls to <code>hl_alloc</code> and
+        <code>hl_release</code> the heap could become chopped up into small
+        interwoven blocks of allocated and freed memory. When your memory
+        region becomes fragmented, the <i>sum</i> of the free blocks of memory
+        might satisfy an <code>hl_alloc</code> request, but since they are not
+        contiguous, the request will fail. Whether you implement a
+        <b>first-fit</b> or <b>best-fit</b> allocation strategy is
+        just one way in which you control the fragmentation of your
+        memory region. Whether you support the coalescing of blocks
+        (explained in the pdf) is another. </li>
+    </ul>
+
+        <!-- Are we still doing this? -->
+
+        <h3 id="leaderboard">The Leaderboard</h3>
+
+        <p><b>The autograder will run your code up to 5 times per day. 
+Note that this autograder only tests the heaplib implementation. Due to 
+prohibitive server loads, ensuring the correctness of your spinlocks is 
+not accounted for in the P6 malloc leaderboard. It is up to you to 
+ensure that your lock/unlock functions work as intended.&lt;</b></p>
+
+        <p>
+          Your code will first be tested for correctness. Code that
+          passes our correctness tests will then be tested
+          for <b>overhead</b>, and <b>heap maintenance</b>. At some point
+          during the following week we will set up a leaderboard that
+          shows how your code fares on these three tests compared to other
+          groups in the class. We hope you will be able to see from this
+          exercise that design choices are full of trade-offs, often
+          sacrificing one metric for another.
+        </p>
+
+        <p>
+          The leaderboard can be found here: <a href="http://www.cs.cornell.edu/courses/cs3410/2019sp/projects/malloc/leaderboard.html">Leaderboard</a>
+        </p>
+
+      </div>
+      <div id="tips" class="tab-content">
+
+        <h2>Tips</h2>
+        <ul>
+          <li><a href="https://d1b10bmlvqabco.cloudfront.net/attach/jcjf1dhd7ns6vw/idud25vuobb263/jgscrxlbtfkg/introtomalloc.pdf">These slides</a> can help give you an idea of the different kinds of implementations you can use.</li>
+        </ul>
+        <ul>
+          <li>Continuously implement the very smallest, testable unit of work
+            possible and then immediately test it for correctness. (Here, your
+            testing helps your implementation.) If no such test exists, write
+            one. (Here, your implementation helps your testing.)</li>
+          <li>You may find <code>gdb</code>, the GNU debugger, helpful while
+            completing this assignment. (Tutorials can be found on
+            <a href="http://www.unknownroad.com/rtfm/gdbtut/gdbtoc.html">unknown road</a>).
+            At the very least, the <code>make print-debug</code> option will give
+            you some insight.</li>
+          <li>This assignment has a lot of programs and a lot of targets. If
+            something strange is happening, you might be making or executing the
+            wrong thing. For example, if you make a change to your
+            <code>heaplame.c</code> and then type <code>make</code> and then
+            <code>./test_heaplib</code> it may look as though your change did
+            nothing. In fact, you should have typed <code>make lame</code> and the
+            change in your code was simply not incorporated into your executable.
+            This is just one example of the ways in which you may occasionally
+            confuse yourself. Take a step back and ask yourself
+            "<i>What am I compiling? What am I running?</i>"</li>
+        </ul>
+
+      </div>
+      <div id="grading" class="tab-content">
+
+        <h2>Grading</h2>
+
+        <p>
+          You will be graded first on the correctness of your malloc
+          implementation. Afterwards, you will receive points based on how well
+          your implementation utilizes the given heap.
+        </p>
+
+        <p>A rough breakdown of your grade is as follows:</p>
+        <ul>
+          <li>25%: Testing</li>
+          <li>55%: Correctness</li>
+          <li>10%: Utilization</li>
+          <li>10%: Speed</li>
+        </ul>
+
+        <p>
+          <b>Note that you will not receive points for utilization or speed if
+            your implementation does not pass the correctness tests!</b>
+        </p>
+
+      </div>
+
+      <hr>
+
+      <h4>Acknowledgements</h4>
+
+      <p>
+        This assignment is the literal descendant of an assignment originally
+        written by Robbert Van Renesse at Cornell. It is the spiritual descendant
+    of the textbook "Computer Systems: A Programmer's Perspective" by Bryant
+    and O'Hallaron, which your instructor thinks is a fantastic book.
+  </p>
+
+</div>
+<div style="height: 100px;"></div>
+</div>
+
+<script src="P6%20Malloc_files/jquery.min.js"></script>
+<script src="P6%20Malloc_files/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script>$('#project-wrapper').scrollspy({ target: '#project-navbar' })</script>
+
+<link rel="stylesheet" href="P6%20Malloc_files/atom-one-dark.min.css">
+<script src="P6%20Malloc_files/highlight.min.js"></script>
+<script>
+$(document).ready(function() {
+    hljs.configure({
+        languages: ["cpp", "makefile"]
+    });
+    $('pre').each(function(i, block) {
+        hljs.highlightBlock(block);
+    });
+});
+</script>
+
+
+
+</div></body></html>
