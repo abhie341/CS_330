@@ -1,0 +1,15 @@
+L4: Entry = 0x209401B NextLevel = 0x2094 FLAGS = 0x1B
+L3: Entry = 0x2095019 NextLevel = 0x2095 FLAGS = 0x19
+VM_Area:[1]	MMAP_Page_Faults[0]
+L4: Entry = 0x209401B NextLevel = 0x2094 FLAGS = 0x1B
+L3: Entry = 0x209501B NextLevel = 0x2095 FLAGS = 0x1B
+L2: Entry = 0x209E01B NextLevel = 0x209E FLAGS = 0x1B
+L1: Entry = 0x641A019 PFN = 0x641A FLAGS = 0x19
+VM_Area:[1]	MMAP_Page_Faults[25]
+L4: Entry = 0x209401B NextLevel = 0x2094 FLAGS = 0x1B
+L3: Entry = 0x209501B NextLevel = 0x2095 FLAGS = 0x1B
+L2: Entry = 0x209E01B NextLevel = 0x209E FLAGS = 0x1B
+L4: Entry = 0x209401B NextLevel = 0x2094 FLAGS = 0x1B
+L3: Entry = 0x209501B NextLevel = 0x2095 FLAGS = 0x1B
+L2: Entry = 0x209E01B NextLevel = 0x209E FLAGS = 0x1B
+

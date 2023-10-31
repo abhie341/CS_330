@@ -1,0 +1,17 @@
+//Note for TAs: You need to specifically look ofr FLAGS at L1: entry. in first case it should be 0x19 and remaining two cases it should be 0x11
+
+L4: Entry = 0x209401B NextLevel = 0x2094 FLAGS = 0x1B
+L3: Entry = 0x209501B NextLevel = 0x2095 FLAGS = 0x1B
+L2: Entry = 0x209601B NextLevel = 0x2096 FLAGS = 0x1B
+L1: Entry = 0x641A019 PFN = 0x641A FLAGS = 0x19
+Child pid:2
+L4: Entry = 0x209F01B NextLevel = 0x209F FLAGS = 0x1B
+L3: Entry = 0x20A2019 NextLevel = 0x20A2 FLAGS = 0x19
+L2: Entry = 0x20A3019 NextLevel = 0x20A3 FLAGS = 0x19
+L1: Entry = 0x641A011 PFN = 0x641A FLAGS = 0x11
+Parent pid:1
+L4: Entry = 0x209401B NextLevel = 0x2094 FLAGS = 0x1B
+L3: Entry = 0x209501B NextLevel = 0x2095 FLAGS = 0x1B
+L2: Entry = 0x209601B NextLevel = 0x2096 FLAGS = 0x1B
+L1: Entry = 0x641A011 PFN = 0x641A FLAGS = 0x11
+
